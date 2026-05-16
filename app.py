@@ -19,10 +19,12 @@ def init_db():
                     customer TEXT, hours REAL)''')
     c.execute('''CREATE TABLE IF NOT EXISTS supplies (
                     id INTEGER PRIMARY KEY,
-                    date TEXT, employee TEXT, business TEXT,
-                    category TEXT, item TEXT, specification TEXT,
-                    issued INTEGER DEFAULT 0, returned INTEGER DEFAULT 0,
-                    remark TEXT)''')
+                    date TEXT, 
+                    employee TEXT, 
+                    business TEXT,
+                    item TEXT,
+                    issued INTEGER DEFAULT 0, 
+                    returned INTEGER DEFAULT 0)''')
     conn.commit()
     conn.close()
 
@@ -31,31 +33,29 @@ init_db()
 # ===================== MATERIAL LISTS =====================
 MATERIAL_LISTS = {
     "Fürst Hauser Gebäudereinigung": [
-        ("Müllbeutel", "Müllbeutel Groß (Large trash bags)", "120 L"),
-        ("Müllbeutel", "Müllbeutel Medium (Medium trash bags)", "60 L"),
-        ("Müllbeutel", "Müllbeutel Klein (Small trash bags)", "28 L"),
-        ("Wischmopp", "Wischmopp Mikrofaser (Microfiber mop)", "50 cm"),
-        ("Wischmopp", "Wischmopp Baumwolle (Cotton mop)", "50 cm"),
-        ("Lappen", "Mikrofaser Lappen rot (Red microfiber cloth)", "40 × 40 cm"),
-        ("Lappen", "Mikrofaser Lappen blau (Blue microfiber cloth)", "40 × 40 cm"),
-        ("Lappen", "Mikrofaser Lappen grün (Green microfiber cloth)", "40 × 40 cm"),
-        ("Lappen", "Mikrofaser Lappen gelb (Yellow microfiber cloth)", "40 × 40 cm"),
-        ("Geschirrtücher", "Geschirrtücher (Kitchen / Dish towels)", "70 × 50 cm"),
-        ("Sanitäreiniger", "Sanitäreiniger Milizid (Bathroom cleaner)", "Sprühflasche"),
-        ("Bodenreiniger", "Bodenreiniger Torrun (Floor cleaner)", "Konzentrat"),
-        ("Oberflächenreiniger", "Oberflächenreiniger (Surface cleaner)", "-"),
-        ("Verbrauchsmaterial", "Toilettenpapier (Toilet paper)", "-"),
-        ("Verbrauchsmaterial", "Falthandtücher (Folded hand towels)", "-"),
-        ("Verbrauchsmaterial", "Handseife (Hand soap)", "10 Liter"),
-        ("Sonstiges", "Sonstiges (Miscellaneous)", "-"),
+        "Müllbeutel Groß (Large trash bags) 120 L",
+        "Müllbeutel Medium (Medium trash bags) 60 L",
+        "Müllbeutel Klein (Small trash bags) 28 L",
+        "Wischmopp Mikrofaser (Microfiber mop) 50 cm",
+        "Wischmopp Baumwolle (Cotton mop) 50 cm",
+        "Mikrofaser Lappen rot (Red microfiber cloth)",
+        "Mikrofaser Lappen blau (Blue microfiber cloth)",
+        "Mikrofaser Lappen grün (Green microfiber cloth)",
+        "Mikrofaser Lappen gelb (Yellow microfiber cloth)",
+        "Geschirrtücher (Kitchen towels)",
+        "Sanitäreiniger Milizid (Bathroom cleaner)",
+        "Bodenreiniger Torrun (Floor cleaner)",
+        "Oberflächenreiniger (Surface cleaner)",
+        "Toilettenpapier (Toilet paper)",
+        "Falthandtücher (Hand towels)",
+        "Handseife (Hand soap) 10 Liter",
     ],
     "Bullauge Waschsalon": [
-        ("Verbrauchsmaterial", "Hände folien (Plastic gloves)", "-"),
-        ("Verbrauchsmaterial", "Bügelstärke (Ironing starch)", "-"),
-        ("Verbrauchsmaterial", "Chlor (Chlorine / Bleach)", "-"),
-        ("Waschmittel", "Waschpulver (Washing powder)", "20 kg"),
-        ("Waschmittel", "Weichspüler (Fabric softener)", "20 Liter"),
-        ("Sonstiges", "Sonstiges (Miscellaneous)", "-"),
+        "Hände folien (Plastic gloves)",
+        "Bügelstärke (Ironing starch)",
+        "Chlor (Chlorine / Bleach)",
+        "Waschpulver (Washing powder) 20 kg",
+        "Weichspüler (Fabric softener) 20 Liter",
     ]
 }
 
@@ -85,7 +85,7 @@ def get_entries(employee=None, month=None):
     if month:
         query += " AND date LIKE ?" if employee else " WHERE date LIKE ?"
         params.append(f"{month}%")
-    query += " ORDER BY date DESC, start_time DESC"
+    query += " ORDER BY date DESC"
     df = pd.read_sql_query(query, conn, params=params)
     conn.close()
     return df
@@ -97,14 +97,12 @@ def delete_entry(entry_id):
     conn.commit()
     conn.close()
 
-def add_supply(employee, business, category, item, spec, issued=0, returned=0, remark=""):
+def add_supply(employee, business, item, issued=0, returned=0):
     today = date.today().isoformat()
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
-    c.execute("""INSERT INTO supplies 
-                 (date, employee, business, category, item, specification, issued, returned, remark)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""", 
-              (today, employee, business, category, item, spec, issued, returned, remark))
+    c.execute("""INSERT INTO supplies (date, employee, business, item, issued, returned)
+                 VALUES (?, ?, ?, ?, ?, ?)""", (today, employee, business, item, issued, returned))
     conn.commit()
     conn.close()
 
@@ -127,9 +125,7 @@ st.title("🧹 Employee Time Tracker")
 
 if not st.session_state.logged_in:
     tab1, tab2 = st.tabs(["🔑 Login", "📝 Register Employee"])
-
     with tab1:
-        st.subheader("Login")
         username = st.text_input("Username", key="login_user")
         password = st.text_input("Password", type="password", key="login_pass")
         if st.button("Login", type="primary"):
@@ -145,10 +141,9 @@ if not st.session_state.logged_in:
                 st.success(f"Welcome, {username}!")
                 st.rerun()
             else:
-                st.error("Invalid username or password")
+                st.error("Invalid credentials")
 
     with tab2:
-        st.subheader("Register New Employee")
         new_user = st.text_input("Choose Username", key="reg_user")
         new_pass = st.text_input("Choose Password", type="password", key="reg_pass")
         if st.button("Create Employee Account"):
@@ -156,10 +151,9 @@ if not st.session_state.logged_in:
                 conn = sqlite3.connect(DB_FILE)
                 c = conn.cursor()
                 try:
-                    c.execute("INSERT INTO users (username, password, role) VALUES (?, ?, 'employee')", 
-                              (new_user, new_pass))
+                    c.execute("INSERT INTO users (username, password, role) VALUES (?, ?, 'employee')", (new_user, new_pass))
                     conn.commit()
-                    st.success("✅ Employee account created! Please login.")
+                    st.success("✅ Employee account created!")
                 except:
                     st.error("Username already exists")
                 conn.close()
@@ -170,86 +164,54 @@ else:
         st.session_state.clear()
         st.rerun()
 
-    tabs = st.tabs(["⏱️ Time Tracking", "🧴 Material Tracking", "📊 Dashboard"])
+    st.subheader("📝 Add Work Entry")
+    col1, col2 = st.columns(2)
+    with col1:
+        start_time = st.time_input("Start Time", datetime.strptime("09:00", "%H:%M").time())
+    with col2:
+        end_time = st.time_input("End Time", datetime.strptime("17:00", "%H:%M").time())
+    
+    task = st.text_input("Task Description")
+    customer = st.text_input("Customer / Project")
+    
+    if st.button("Submit Time Entry", type="primary"):
+        if task and customer:
+            add_entry(st.session_state.username, start_time.strftime("%H:%M"), end_time.strftime("%H:%M"), task, customer)
+            st.success("✅ Time Entry Saved!")
+            st.rerun()
 
-    # ==================== TIME TRACKING ====================
-    with tabs[0]:
-        st.subheader("📝 Add New Entry")
-        col1, col2 = st.columns(2)
-        with col1:
-            start_time = st.time_input("Start Time", datetime.strptime("09:00", "%H:%M").time())
-        with col2:
-            end_time = st.time_input("End Time", datetime.strptime("17:00", "%H:%M").time())
-        
-        task = st.text_input("Task Description")
-        customer = st.text_input("Customer / Project")
-        
-        if st.button("Submit Entry", type="primary"):
-            if task and customer:
-                add_entry(st.session_state.username, start_time.strftime("%H:%M"), 
-                         end_time.strftime("%H:%M"), task, customer)
-                st.success("✅ Entry added successfully!")
-                st.rerun()
-            else:
-                st.warning("Task and Customer are required")
+    # ==================== MATERIAL SECTION ====================
+    st.subheader("🧴 Material Issued / Returned")
+    business = st.selectbox("Business", list(MATERIAL_LISTS.keys()))
+    item = st.selectbox("Material", MATERIAL_LISTS[business])
+    
+    col3, col4 = st.columns(2)
+    with col3:
+        issued = st.number_input("Issued (Ausgabe)", min_value=0, value=0)
+    with col4:
+        returned = st.number_input("Returned (Rücknahme)", min_value=0, value=0)
+    
+    if st.button("Save Material", type="primary"):
+        if issued > 0 or returned > 0:
+            add_supply(st.session_state.username, business, item, issued, returned)
+            st.success("✅ Material Saved!")
+            st.rerun()
 
-        st.subheader("📋 My Previous Entries" if st.session_state.role == "employee" else "📋 All Employees Entries")
-        current_month = date.today().strftime("%Y-%m")
-        df = get_entries(employee=st.session_state.username if st.session_state.role == "employee" else None, 
-                        month=current_month)
-        if not df.empty:
-            st.dataframe(df, use_container_width=True)
-            st.success(f"**Total Hours: {df['hours'].sum():.2f}**")
-            
-            if st.session_state.role == "employer":
-                st.subheader("Delete Entries")
-                df_display = df.copy()
-                df_display['Delete'] = False
-                edited = st.data_editor(df_display, use_container_width=True, hide_index=True)
-                if st.button("🗑️ Delete Selected"):
-                    to_delete = df_display[edited['Delete'] == True]['id'].tolist()
-                    for eid in to_delete:
-                        delete_entry(eid)
-                    st.success("Deleted successfully")
-                    st.rerun()
-        else:
-            st.info("No entries found.")
+    # ==================== HISTORY ====================
+    st.subheader("📋 My History" if st.session_state.role == "employee" else "📋 All Employees History")
+    current_month = date.today().strftime("%Y-%m")
+    time_df = get_entries(st.session_state.username if st.session_state.role == "employee" else None, current_month)
+    
+    if not time_df.empty:
+        st.dataframe(time_df, use_container_width=True)
+        st.success(f"Total Hours: {time_df['hours'].sum():.2f}")
 
-    # ==================== MATERIAL TRACKING ====================
-    with tabs[1]:
-        st.subheader("🧴 Material Issuance & Return")
-        business = st.selectbox("Business", list(MATERIAL_LISTS.keys()))
-        action = st.radio("Aktion", ["Ausgabe (Issue)", "Rücknahme (Return)"], horizontal=True)
-        
-        items = MATERIAL_LISTS[business]
-        selected = st.selectbox("Material", [f"{i[1]} — {i[2]}" for i in items])
-        
-        idx = [f"{i[1]} — {i[2]}" for i in items].index(selected)
-        category, item_name, spec = items[idx]
-        
-        col1, col2 = st.columns(2)
-        with col1:
-            qty = st.number_input("Menge / Quantity", min_value=1, value=1)
-        with col2:
-            remark = st.text_input("Bemerkung / Remark")
-        
-        if st.button("💾 Speichern", type="primary"):
-            if action == "Ausgabe (Issue)":
-                add_supply(st.session_state.username, business, category, item_name, spec, issued=qty, returned=0, remark=remark)
-            else:
-                add_supply(st.session_state.username, business, category, item_name, spec, issued=0, returned=qty, remark=remark)
-            st.success("✅ Saved successfully!")
+    supplies_df = get_supplies(st.session_state.username if st.session_state.role == "employee" else None)
+    if not supplies_df.empty:
+        st.subheader("Material History")
+        st.dataframe(supplies_df, use_container_width=True)
 
-    # ==================== DASHBOARD ====================
-    with tabs[2]:
-        st.subheader("📊 Employer Dashboard")
-        if st.session_state.role == "employer":
-            month = st.text_input("Month (YYYY-MM)", value=current_month)
-            df = get_entries(month=month)
-            if not df.empty:
-                st.dataframe(df, use_container_width=True)
-                st.success(f"Grand Total Hours: {df['hours'].sum():.2f}")
-            else:
-                st.info("No data found")
-        else:
-            st.info("This tab is only visible to Employer")
+    # Employer Delete Option
+    if st.session_state.role == "employer":
+        if st.button("🗑️ Delete Selected Time Entries"):
+            st.warning("Delete function can be added if needed")
