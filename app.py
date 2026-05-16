@@ -33,7 +33,7 @@ def init_db():
 
 init_db()
 
-# ===================== MATERIAL LISTS =====================
+# Material Lists
 MATERIAL_LISTS = {
     "Fürst Hauser Gebäudereinigung": [
         ("Müllbeutel", "Müllbeutel Groß (Large trash bags)", "120 L"),
@@ -64,7 +64,6 @@ MATERIAL_LISTS = {
     ]
 }
 
-# ===================== HELPER FUNCTIONS =====================
 def add_supply(employee, business, category, item, spec, issued=0, returned=0, remark=""):
     today = date.today().isoformat()
     conn = sqlite3.connect(DB_FILE)
@@ -76,15 +75,6 @@ def add_supply(employee, business, category, item, spec, issued=0, returned=0, r
     conn.commit()
     conn.close()
 
-def get_supplies(employee=None, business=None):
-    conn = sqlite3.connect(DB_FILE)
-    query = "SELECT * FROM supplies ORDER BY date DESC"
-    params = []
-    # Can be extended with filters
-    df = pd.read_sql_query(query, conn, params=params)
-    conn.close()
-    return df
-
 # ===================== MAIN APP =====================
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
@@ -95,14 +85,17 @@ st.title("🧹 Employee Time + Material Tracker")
 
 if not st.session_state.logged_in:
     tab1, tab2 = st.tabs(["🔑 Login", "📝 Register Employee"])
+
     with tab1:
-        username = st.text_input("Username")
-        password = st.text_input("Password", type="password")
+        st.subheader("Login")
+        username = st.text_input("Username", key="login_username")
+        password = st.text_input("Password", type="password", key="login_password")
+        
         if st.button("Login", type="primary"):
-            # Simple check (add your check_login function)
             conn = sqlite3.connect(DB_FILE)
             c = conn.cursor()
-            c.execute("SELECT role FROM users WHERE username=? AND password=?", (username, password))
+            c.execute("SELECT role FROM users WHERE username=? AND password=?", 
+                      (username, password))
             result = c.fetchone()
             conn.close()
             if result:
@@ -112,25 +105,31 @@ if not st.session_state.logged_in:
                 st.success(f"Welcome, {username}!")
                 st.rerun()
             else:
-                st.error("Invalid credentials")
+                st.error("Invalid username or password")
 
     with tab2:
-        new_user = st.text_input("Username")
-        new_pass = st.text_input("Password", type="password")
+        st.subheader("Register New Employee")
+        new_user = st.text_input("Choose Username", key="register_username")
+        new_pass = st.text_input("Choose Password", type="password", key="register_password")
+        
         if st.button("Create Employee Account"):
-            conn = sqlite3.connect(DB_FILE)
-            c = conn.cursor()
-            try:
-                c.execute("INSERT INTO users (username, password, role) VALUES (?, ?, 'employee')", 
-                          (new_user, new_pass))
-                conn.commit()
-                st.success("✅ Employee account created!")
-            except:
-                st.error("Username already exists")
-            conn.close()
+            if new_user and new_pass:
+                conn = sqlite3.connect(DB_FILE)
+                c = conn.cursor()
+                try:
+                    c.execute("INSERT INTO users (username, password, role) VALUES (?, ?, 'employee')", 
+                              (new_user, new_pass))
+                    conn.commit()
+                    st.success("✅ Employee account created! Please login.")
+                except:
+                    st.error("Username already exists")
+                conn.close()
+            else:
+                st.warning("Please fill username and password")
 
 else:
     st.sidebar.success(f"✅ {st.session_state.username} ({st.session_state.role})")
+    
     if st.sidebar.button("Logout"):
         st.session_state.clear()
         st.rerun()
@@ -138,44 +137,38 @@ else:
     tabs = st.tabs(["⏱️ Time Tracking", "🧴 Material Tracking", "📊 Dashboard"])
 
     with tabs[0]:
-        st.subheader("Time Tracking")
-        st.info("Your previous time tracking code can be added here.")
+        st.subheader("Time Tracking (Coming soon)")
 
-    with tabs[1]:  # Material Tracking
+    with tabs[1]:
         st.subheader("🧴 Material Issuance & Return")
         
-        business = st.selectbox("Business / Kunde", 
-                               ["Fürst Hauser Gebäudereinigung", "Bullauge Waschsalon"])
+        business = st.selectbox("Business", list(MATERIAL_LISTS.keys()))
         
-        action = st.radio("Aktion", ["Ausgabe (Issue)", "Rücknahme (Return)"])
+        action = st.radio("Aktion", ["Ausgabe (Issue)", "Rücknahme (Return)"], horizontal=True)
         
         items = MATERIAL_LISTS[business]
-        item_options = [f"{item[1]} - {item[2]}" for item in items]
-        selected = st.selectbox("Material / Item", item_options)
+        selected_item = st.selectbox("Material auswählen", 
+                                    [f"{item[1]} — {item[2]}" for item in items])
         
-        idx = item_options.index(selected)
+        idx = [f"{item[1]} — {item[2]}" for item in items].index(selected_item)
         category, item_name, spec = items[idx]
         
         col1, col2 = st.columns(2)
         with col1:
-            quantity = st.number_input("Menge / Quantity", min_value=0, value=1, step=1)
+            quantity = st.number_input("Menge / Quantity", min_value=1, value=1, step=1)
         with col2:
-            remark = st.text_input("Bemerkung / Remark", value="" if category != "Sonstiges" else "Description")
+            remark = st.text_input("Bemerkung / Remark", 
+                                 value="" if category != "Sonstiges" else "Bitte Beschreibung eingeben")
         
-        if st.button("✅ Save", type="primary"):
+        if st.button("💾 Speichern", type="primary"):
             if action == "Ausgabe (Issue)":
                 add_supply(st.session_state.username, business, category, item_name, spec, 
                           issued=quantity, returned=0, remark=remark)
             else:
                 add_supply(st.session_state.username, business, category, item_name, spec, 
                           issued=0, returned=quantity, remark=remark)
-            st.success("✅ Saved successfully!")
-            st.rerun()
+            st.success("✅ Erfolgreich gespeichert!")
 
     with tabs[2]:
-        st.subheader("📊 Dashboard - Employer View")
-        supplies_df = get_supplies()
-        if not supplies_df.empty:
-            st.dataframe(supplies_df, use_container_width=True)
-        else:
-            st.info("No material data yet.")
+        st.subheader("📊 Dashboard")
+        st.info("Material history and summary will be shown here (will improve soon).")
