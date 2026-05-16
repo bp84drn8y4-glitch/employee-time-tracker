@@ -71,19 +71,31 @@ def add_entry(employee, start, end, task, customer):
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
     c.execute("""INSERT INTO entries (date, employee, start_time, end_time, task, customer, hours)
-                 VALUES (?, ?, ?, ?, ?, ?, ?)""", 
-              (today, employee, start, end, task, customer, hours))
+                 VALUES (?, ?, ?, ?, ?, ?, ?)""", (today, employee, start, end, task, customer, hours))
     conn.commit()
     conn.close()
 
-def get_entries(month=None):
+def get_entries(employee=None, month=None):
     conn = sqlite3.connect(DB_FILE)
+    query = "SELECT * FROM entries"
+    params = []
+    if employee:
+        query += " WHERE employee = ?"
+        params.append(employee)
     if month:
-        df = pd.read_sql_query("SELECT * FROM entries WHERE date LIKE ? ORDER BY date DESC", conn, params=[f"{month}%"])
-    else:
-        df = pd.read_sql_query("SELECT * FROM entries ORDER BY date DESC", conn)
+        query += " AND date LIKE ?" if employee else " WHERE date LIKE ?"
+        params.append(f"{month}%")
+    query += " ORDER BY date DESC, start_time DESC"
+    df = pd.read_sql_query(query, conn, params=params)
     conn.close()
     return df
+
+def delete_entry(entry_id):
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    c.execute("DELETE FROM entries WHERE id = ?", (entry_id,))
+    conn.commit()
+    conn.close()
 
 def add_supply(employee, business, category, item, spec, issued=0, returned=0, remark=""):
     today = date.today().isoformat()
@@ -96,9 +108,12 @@ def add_supply(employee, business, category, item, spec, issued=0, returned=0, r
     conn.commit()
     conn.close()
 
-def get_supplies():
+def get_supplies(employee=None):
     conn = sqlite3.connect(DB_FILE)
-    df = pd.read_sql_query("SELECT * FROM supplies ORDER BY date DESC", conn)
+    if employee:
+        df = pd.read_sql_query("SELECT * FROM supplies WHERE employee = ? ORDER BY date DESC", conn, params=[employee])
+    else:
+        df = pd.read_sql_query("SELECT * FROM supplies ORDER BY date DESC", conn)
     conn.close()
     return df
 
@@ -159,7 +174,7 @@ else:
 
     # ==================== TIME TRACKING ====================
     with tabs[0]:
-        st.subheader("📝 Add Work Entry")
+        st.subheader("📝 Add New Entry")
         col1, col2 = st.columns(2)
         with col1:
             start_time = st.time_input("Start Time", datetime.strptime("09:00", "%H:%M").time())
@@ -178,14 +193,27 @@ else:
             else:
                 st.warning("Task and Customer are required")
 
-        st.subheader("My Entries This Month")
+        st.subheader("📋 My Previous Entries" if st.session_state.role == "employee" else "📋 All Employees Entries")
         current_month = date.today().strftime("%Y-%m")
-        df = get_entries(current_month)
+        df = get_entries(employee=st.session_state.username if st.session_state.role == "employee" else None, 
+                        month=current_month)
         if not df.empty:
             st.dataframe(df, use_container_width=True)
-            st.success(f"**Total Hours this month: {df['hours'].sum():.2f}**")
+            st.success(f"**Total Hours: {df['hours'].sum():.2f}**")
+            
+            if st.session_state.role == "employer":
+                st.subheader("Delete Entries")
+                df_display = df.copy()
+                df_display['Delete'] = False
+                edited = st.data_editor(df_display, use_container_width=True, hide_index=True)
+                if st.button("🗑️ Delete Selected"):
+                    to_delete = df_display[edited['Delete'] == True]['id'].tolist()
+                    for eid in to_delete:
+                        delete_entry(eid)
+                    st.success("Deleted successfully")
+                    st.rerun()
         else:
-            st.info("No entries yet this month.")
+            st.info("No entries found.")
 
     # ==================== MATERIAL TRACKING ====================
     with tabs[1]:
@@ -214,19 +242,14 @@ else:
 
     # ==================== DASHBOARD ====================
     with tabs[2]:
-        st.subheader("📊 Dashboard")
-        st.write("### Time Entries")
-        month = st.text_input("Month (YYYY-MM)", value=date.today().strftime("%Y-%m"))
-        time_df = get_entries(month)
-        if not time_df.empty:
-            st.dataframe(time_df, use_container_width=True)
-            st.success(f"Total Hours: {time_df['hours'].sum():.2f}")
+        st.subheader("📊 Employer Dashboard")
+        if st.session_state.role == "employer":
+            month = st.text_input("Month (YYYY-MM)", value=current_month)
+            df = get_entries(month=month)
+            if not df.empty:
+                st.dataframe(df, use_container_width=True)
+                st.success(f"Grand Total Hours: {df['hours'].sum():.2f}")
+            else:
+                st.info("No data found")
         else:
-            st.info("No time entries for this month.")
-
-        st.write("### Material History")
-        supplies_df = get_supplies()
-        if not supplies_df.empty:
-            st.dataframe(supplies_df, use_container_width=True)
-        else:
-            st.info("No material records yet.")
+            st.info("This tab is only visible to Employer")
