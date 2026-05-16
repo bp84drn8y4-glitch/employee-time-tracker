@@ -3,7 +3,7 @@ import pandas as pd
 from datetime import datetime, date
 import sqlite3
 
-st.set_page_config(page_title="Employee Time + Material Tracker", layout="wide")
+st.set_page_config(page_title="Employee Time Tracker", layout="wide")
 
 DB_FILE = "time_tracker.db"
 
@@ -33,20 +33,47 @@ def init_db():
 
 init_db()
 
-# Material Lists (same as before)
-MATERIAL_LISTS = { ... }   # Keep the same material lists from previous code
+# ===================== MATERIAL LISTS =====================
+MATERIAL_LISTS = {
+    "Fürst Hauser Gebäudereinigung": [
+        ("Müllbeutel", "Müllbeutel Groß (Large trash bags)", "120 L"),
+        ("Müllbeutel", "Müllbeutel Medium (Medium trash bags)", "60 L"),
+        ("Müllbeutel", "Müllbeutel Klein (Small trash bags)", "28 L"),
+        ("Wischmopp", "Wischmopp Mikrofaser (Microfiber mop)", "50 cm"),
+        ("Wischmopp", "Wischmopp Baumwolle (Cotton mop)", "50 cm"),
+        ("Lappen", "Mikrofaser Lappen rot (Red microfiber cloth)", "40 × 40 cm"),
+        ("Lappen", "Mikrofaser Lappen blau (Blue microfiber cloth)", "40 × 40 cm"),
+        ("Lappen", "Mikrofaser Lappen grün (Green microfiber cloth)", "40 × 40 cm"),
+        ("Lappen", "Mikrofaser Lappen gelb (Yellow microfiber cloth)", "40 × 40 cm"),
+        ("Geschirrtücher", "Geschirrtücher (Kitchen / Dish towels)", "70 × 50 cm"),
+        ("Sanitäreiniger", "Sanitäreiniger Milizid (Bathroom cleaner)", "Sprühflasche"),
+        ("Bodenreiniger", "Bodenreiniger Torrun (Floor cleaner)", "Konzentrat"),
+        ("Oberflächenreiniger", "Oberflächenreiniger (Surface cleaner)", "-"),
+        ("Verbrauchsmaterial", "Toilettenpapier (Toilet paper)", "-"),
+        ("Verbrauchsmaterial", "Falthandtücher (Folded hand towels)", "-"),
+        ("Verbrauchsmaterial", "Handseife (Hand soap)", "10 Liter"),
+        ("Sonstiges", "Sonstiges (Miscellaneous)", "-"),
+    ],
+    "Bullauge Waschsalon": [
+        ("Verbrauchsmaterial", "Hände folien (Plastic gloves)", "-"),
+        ("Verbrauchsmaterial", "Bügelstärke (Ironing starch)", "-"),
+        ("Verbrauchsmaterial", "Chlor (Chlorine / Bleach)", "-"),
+        ("Waschmittel", "Waschpulver (Washing powder)", "20 kg"),
+        ("Waschmittel", "Weichspüler (Fabric softener)", "20 Liter"),
+        ("Sonstiges", "Sonstiges (Miscellaneous)", "-"),
+    ]
+}
 
-# ===================== HELPER FUNCTIONS =====================
-def get_time_entries(month=None):
+def add_supply(employee, business, category, item, spec, issued=0, returned=0, remark=""):
+    today = date.today().isoformat()
     conn = sqlite3.connect(DB_FILE)
-    query = "SELECT * FROM entries ORDER BY date DESC"
-    if month:
-        query = "SELECT * FROM entries WHERE date LIKE ? ORDER BY date DESC"
-        df = pd.read_sql_query(query, conn, params=[f"{month}%"])
-    else:
-        df = pd.read_sql_query(query, conn)
+    c = conn.cursor()
+    c.execute("""INSERT INTO supplies 
+                 (date, employee, business, category, item, specification, issued, returned, remark)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""", 
+              (today, employee, business, category, item, spec, issued, returned, remark))
+    conn.commit()
     conn.close()
-    return df
 
 def get_supplies():
     conn = sqlite3.connect(DB_FILE)
@@ -60,12 +87,13 @@ if "logged_in" not in st.session_state:
     st.session_state.role = None
     st.session_state.username = None
 
-st.title("🧹 Employee Time + Material Tracker")
+st.title("🧹 Employee Time Tracker")
 
 if not st.session_state.logged_in:
-    # Login + Register (same as last working version)
     tab1, tab2 = st.tabs(["🔑 Login", "📝 Register Employee"])
+
     with tab1:
+        st.subheader("Login")
         username = st.text_input("Username", key="login_user")
         password = st.text_input("Password", type="password", key="login_pass")
         if st.button("Login", type="primary"):
@@ -82,7 +110,24 @@ if not st.session_state.logged_in:
                 st.rerun()
             else:
                 st.error("Invalid credentials")
-    # Register tab (same)
+
+    with tab2:
+        st.subheader("Register New Employee")
+        new_user = st.text_input("Choose Username", key="reg_user")
+        new_pass = st.text_input("Choose Password", type="password", key="reg_pass")
+        if st.button("Create Employee Account"):
+            if new_user and new_pass:
+                conn = sqlite3.connect(DB_FILE)
+                c = conn.cursor()
+                try:
+                    c.execute("INSERT INTO users (username, password, role) VALUES (?, ?, 'employee')", 
+                              (new_user, new_pass))
+                    conn.commit()
+                    st.success("✅ Employee account created!")
+                except:
+                    st.error("Username already exists")
+                conn.close()
+
 else:
     st.sidebar.success(f"✅ {st.session_state.username} ({st.session_state.role})")
     if st.sidebar.button("Logout"):
@@ -92,40 +137,36 @@ else:
     tabs = st.tabs(["⏱️ Time Tracking", "🧴 Material Tracking", "📊 Dashboard"])
 
     with tabs[0]:
-        st.subheader("Time Tracking")
-        st.info("Add your time tracking code here if needed")
+        st.info("Time Tracking module coming soon...")
 
     with tabs[1]:
-        # Material Tracking (same as before)
         st.subheader("🧴 Material Issuance & Return")
         business = st.selectbox("Business", list(MATERIAL_LISTS.keys()))
         action = st.radio("Aktion", ["Ausgabe (Issue)", "Rücknahme (Return)"], horizontal=True)
-        # ... rest of material code (same as previous message)
-        st.info("Material form here...")
-
-    with tabs[2]:   # ← Improved Dashboard
-        st.subheader("📊 Full Dashboard")
-
+        
+        items = MATERIAL_LISTS[business]
+        selected = st.selectbox("Material", [f"{i[1]} — {i[2]}" for i in items])
+        
+        idx = [f"{i[1]} — {i[2]}" for i in items].index(selected)
+        category, item_name, spec = items[idx]
+        
         col1, col2 = st.columns(2)
         with col1:
-            st.subheader("Time Entries")
-            month = st.text_input("Month (YYYY-MM)", value=date.today().strftime("%Y-%m"))
-            time_df = get_time_entries(month)
-            if not time_df.empty:
-                st.dataframe(time_df, use_container_width=True)
-                st.success(f"Total Hours: {time_df['hours'].sum():.2f}")
-            else:
-                st.info("No time entries found")
-
+            qty = st.number_input("Menge / Quantity", min_value=1, value=1)
         with col2:
-            st.subheader("Material Transactions")
-            supplies_df = get_supplies()
-            if not supplies_df.empty:
-                st.dataframe(supplies_df, use_container_width=True)
+            remark = st.text_input("Bemerkung / Remark")
+        
+        if st.button("💾 Speichern", type="primary"):
+            if action == "Ausgabe (Issue)":
+                add_supply(st.session_state.username, business, category, item_name, spec, issued=qty, returned=0, remark=remark)
             else:
-                st.info("No material transactions yet")
+                add_supply(st.session_state.username, business, category, item_name, spec, issued=0, returned=qty, remark=remark)
+            st.success("✅ Saved successfully!")
 
-        # Summary
-        st.subheader("Summary")
-        total_employees = len(pd.read_sql_query("SELECT username FROM users WHERE role='employee'", sqlite3.connect(DB_FILE)))
-        st.write(f"**Registered Employees:** {total_employees}")
+    with tabs[2]:
+        st.subheader("📊 Dashboard")
+        supplies = get_supplies()
+        if not supplies.empty:
+            st.dataframe(supplies, use_container_width=True)
+        else:
+            st.info("No material data yet.")
