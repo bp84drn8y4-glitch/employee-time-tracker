@@ -25,29 +25,19 @@ def init_db():
 
 init_db()
 
-# ===================== MATERIAL LISTS =====================
 MATERIAL_LISTS = {
     "Fürst Hauser Gebäudereinigung": [
-        "Müllbeutel Groß (Large trash bags) 120 L",
-        "Müllbeutel Medium (Medium trash bags) 60 L",
-        "Müllbeutel Klein (Small trash bags) 28 L",
-        "Wischmopp Mikrofaser (Microfiber mop) 50 cm",
-        "Wischmopp Baumwolle (Cotton mop) 50 cm",
-        "Mikrofaser Lappen rot (Red microfiber cloth)",
-        "Mikrofaser Lappen blau (Blue microfiber cloth)",
-        "Mikrofaser Lappen grün (Green microfiber cloth)",
-        "Mikrofaser Lappen gelb (Yellow microfiber cloth)",
-        "Geschirrtücher (Kitchen towels)",
-        "Sanitäreiniger (Bathroom cleaner)",
-        "Bodenreiniger (Floor cleaner)",
-        "Toilettenpapier (Toilet paper)",
-        "Handseife (Hand soap)"
+        "Müllbeutel Groß (Large trash bags) 120 L", "Müllbeutel Medium (Medium) 60 L", 
+        "Müllbeutel Klein (Small) 28 L", "Wischmopp Mikrofaser (Microfiber mop) 50 cm",
+        "Wischmopp Baumwolle (Cotton mop) 50 cm", "Mikrofaser Lappen rot (Red)", 
+        "Mikrofaser Lappen blau (Blue)", "Mikrofaser Lappen grün (Green)", 
+        "Mikrofaser Lappen gelb (Yellow)", "Geschirrtücher (Kitchen towels)",
+        "Sanitäreiniger (Bathroom cleaner)", "Bodenreiniger (Floor cleaner)",
+        "Toilettenpapier (Toilet paper)", "Handseife (Hand soap)"
     ],
     "Bullauge Waschsalon": [
-        "Hände folien (Plastic gloves)",
-        "Bügelstärke (Ironing starch)",
-        "Chlor (Chlorine / Bleach)",
-        "Waschpulver (Washing powder) 20 kg",
+        "Hände folien (Plastic gloves)", "Bügelstärke (Ironing starch)", 
+        "Chlor (Chlorine)", "Waschpulver (Washing powder) 20 kg", 
         "Weichspüler (Fabric softener) 20 Liter"
     ]
 }
@@ -82,13 +72,6 @@ def get_entries(employee=None, month=None):
     df = pd.read_sql_query(query, conn, params=params)
     conn.close()
     return df
-
-def delete_entry(entry_id):
-    conn = sqlite3.connect(DB_FILE)
-    c = conn.cursor()
-    c.execute("DELETE FROM entries WHERE id = ?", (entry_id,))
-    conn.commit()
-    conn.close()
 
 def add_supply(employee, business, item, issued=0, returned=0):
     today = date.today().isoformat()
@@ -129,7 +112,7 @@ if "logged_in" not in st.session_state:
 st.title("🧹 Zeiterfassung (Employee Time Tracker)")
 
 if not st.session_state.logged_in:
-    tab1, tab2 = st.tabs(["🔑 Login", "👤 Mitarbeiter verwalten (Admin only)"])
+    tab1, _ = st.tabs(["🔑 Login", "👤 Mitarbeiter verwalten"])
 
     with tab1:
         st.subheader("Anmelden (Login)")
@@ -150,25 +133,27 @@ if not st.session_state.logged_in:
             else:
                 st.error("Ungültige Zugangsdaten (Invalid credentials)")
 
-    with tab2:
-        st.subheader("Neuen Mitarbeiter hinzufügen (Add New Employee)")
-        new_user = st.text_input("Benutzername (Username)", key="new_user")
-        new_pass = st.text_input("Passwort (Password)", type="password", key="new_pass")
-        if st.button("Mitarbeiter erstellen (Create Employee)"):
-            if new_user and new_pass:
-                if add_new_employee(new_user, new_pass):
-                    st.success(f"Mitarbeiter '{new_user}' wurde erstellt! (Employee created!)")
-                else:
-                    st.error("Benutzername existiert bereits (Username already exists)")
-            else:
-                st.warning("Bitte alle Felder ausfüllen (Please fill all fields)")
-
 else:
     st.sidebar.success(f"✅ {st.session_state.username} ({st.session_state.role})")
     if st.sidebar.button("Abmelden (Logout)"):
         st.session_state.clear()
         st.rerun()
 
+    # ==================== ADMIN ONLY: Add Employee ====================
+    if st.session_state.role == "employer":
+        with st.expander("👤 Neuen Mitarbeiter hinzufügen (Add New Employee)"):
+            new_user = st.text_input("Benutzername (Username)", key="admin_new_user")
+            new_pass = st.text_input("Passwort (Password)", type="password", key="admin_new_pass")
+            if st.button("Mitarbeiter erstellen (Create Employee)"):
+                if new_user and new_pass:
+                    if add_new_employee(new_user, new_pass):
+                        st.success(f"Mitarbeiter '{new_user}' wurde erstellt!")
+                    else:
+                        st.error("Benutzername existiert bereits")
+                else:
+                    st.warning("Bitte alle Felder ausfüllen")
+
+    # ==================== MAIN FUNCTIONS ====================
     st.subheader("📝 Arbeitszeit eintragen (Record Working Time)")
     col1, col2 = st.columns(2)
     with col1:
@@ -186,11 +171,11 @@ else:
             st.success("✅ Eintrag gespeichert! (Entry saved!)")
             st.rerun()
         else:
-            st.warning("Tätigkeit und Kunde sind erforderlich (Task and Customer required)")
+            st.warning("Tätigkeit und Kunde sind erforderlich")
 
-    st.subheader("🧴 Material (Ausgabe / Rücknahme - Issued / Returned)")
+    st.subheader("🧴 Material (Ausgabe / Rücknahme)")
     business = st.selectbox("Betrieb (Business)", list(MATERIAL_LISTS.keys()))
-    item = st.selectbox("Material auswählen (Select Material)", MATERIAL_LISTS[business])
+    item = st.selectbox("Material auswählen", MATERIAL_LISTS[business])
     
     col3, col4 = st.columns(2)
     with col3:
@@ -201,9 +186,9 @@ else:
     if st.button("Material speichern (Save Material)"):
         if issued > 0 or returned > 0:
             add_supply(st.session_state.username, business, item, issued, returned)
-            st.success("✅ Material gespeichert! (Material saved!)")
+            st.success("✅ Material gespeichert!")
 
-    # History Section
+    # History
     st.subheader("📋 Meine Einträge (My Entries)" if st.session_state.role == "employee" else "📋 Alle Einträge (All Entries)")
     current_month = date.today().strftime("%Y-%m")
     df = get_entries(st.session_state.username if st.session_state.role == "employee" else None, current_month)
@@ -212,9 +197,8 @@ else:
         st.dataframe(df, use_container_width=True)
         st.success(f"Gesamtstunden / Total Hours: {df['hours'].sum():.2f}")
     else:
-        st.info("Noch keine Einträge vorhanden (No entries yet)")
+        st.info("Noch keine Einträge (No entries yet)")
 
-    # Material History
     supplies_df = get_supplies(st.session_state.username if st.session_state.role == "employee" else None)
     if not supplies_df.empty:
         st.subheader("🧴 Materialhistorie (Material History)")
