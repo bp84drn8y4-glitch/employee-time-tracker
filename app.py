@@ -25,7 +25,7 @@ def init_db():
 
 init_db()
 
-# Material Lists (German main)
+# Material Lists
 MATERIAL_LISTS = {
     "Fürst Hauser Gebäudereinigung": [
         "Müllbeutel Groß (Large trash bags) 120 L",
@@ -131,12 +131,12 @@ if "logged_in" not in st.session_state:
 st.title("🧹 Employee Time Tracker")
 
 if not st.session_state.logged_in:
-    tab1, tab2 = st.tabs(["🔑 Login", "👤 Mitarbeiter verwalten (nur Admin)"])
+    tab1, tab2 = st.tabs(["🔑 Login", "👤 Mitarbeiter verwalten (Admin only)"])
 
     with tab1:
         st.subheader("Login")
-        username = st.text_input("Benutzername (Username)")
-        password = st.text_input("Passwort (Password)", type="password")
+        username = st.text_input("Benutzername (Username)", key="login_username")
+        password = st.text_input("Passwort (Password)", type="password", key="login_password")
         if st.button("Anmelden (Login)", type="primary"):
             conn = sqlite3.connect(DB_FILE)
             c = conn.cursor()
@@ -150,20 +150,20 @@ if not st.session_state.logged_in:
                 st.success(f"Willkommen, {username}!")
                 st.rerun()
             else:
-                st.error("Ungültige Zugangsdaten (Invalid credentials)")
+                st.error("Ungültige Zugangsdaten")
 
     with tab2:
-        st.subheader("Neuen Mitarbeiter hinzufügen (Add New Employee)")
-        new_user = st.text_input("Benutzername (Username)")
-        new_pass = st.text_input("Passwort (Password)", type="password")
+        st.subheader("Neuen Mitarbeiter hinzufügen")
+        new_user = st.text_input("Benutzername (Username)", key="new_user")
+        new_pass = st.text_input("Passwort (Password)", type="password", key="new_pass")
         if st.button("Mitarbeiter erstellen (Create Employee)"):
             if new_user and new_pass:
                 if add_new_employee(new_user, new_pass):
-                    st.success(f"Mitarbeiter '{new_user}' wurde erstellt!")
+                    st.success(f"Mitarbeiter '{new_user}' wurde erfolgreich erstellt!")
                 else:
                     st.error("Benutzername existiert bereits")
             else:
-                st.warning("Bitte alle Felder ausfüllen")
+                st.warning("Bitte Benutzername und Passwort eingeben")
 
 else:
     st.sidebar.success(f"✅ {st.session_state.username} ({st.session_state.role})")
@@ -171,29 +171,29 @@ else:
         st.session_state.clear()
         st.rerun()
 
-    st.subheader("📝 Arbeitszeit eintragen (Add Work Entry)")
+    st.subheader("📝 Arbeitszeit eintragen")
     col1, col2 = st.columns(2)
     with col1:
-        start_time = st.time_input("Startzeit (Start Time)", datetime.strptime("09:00", "%H:%M").time())
+        start_time = st.time_input("Startzeit", datetime.strptime("09:00", "%H:%M").time())
     with col2:
-        end_time = st.time_input("Endzeit (End Time)", datetime.strptime("17:00", "%H:%M").time())
+        end_time = st.time_input("Endzeit", datetime.strptime("17:00", "%H:%M").time())
     
-    task = st.text_input("Tätigkeit (Task Description)")
-    customer = st.text_input("Kunde / Projekt (Customer / Project)")
+    task = st.text_input("Tätigkeit (Task)")
+    customer = st.text_input("Kunde / Projekt (Customer)")
     
-    if st.button("Eintrag speichern (Submit Entry)", type="primary"):
+    if st.button("Eintrag speichern", type="primary"):
         if task and customer:
             add_entry(st.session_state.username, start_time.strftime("%H:%M"), 
                      end_time.strftime("%H:%M"), task, customer)
             st.success("✅ Eintrag gespeichert!")
             st.rerun()
         else:
-            st.warning("Tätigkeit und Kunde sind erforderlich")
+            st.warning("Tätigkeit und Kunde erforderlich")
 
     # Material Section
     st.subheader("🧴 Material (Ausgabe / Rücknahme)")
-    business = st.selectbox("Betrieb (Business)", list(MATERIAL_LISTS.keys()))
-    item = st.selectbox("Material auswählen (Select Material)", MATERIAL_LISTS[business])
+    business = st.selectbox("Betrieb", list(MATERIAL_LISTS.keys()))
+    item = st.selectbox("Material", MATERIAL_LISTS[business])
     
     col3, col4 = st.columns(2)
     with col3:
@@ -201,24 +201,18 @@ else:
     with col4:
         returned = st.number_input("Rücknahme (Returned)", min_value=0, value=0)
     
-    if st.button("Material speichern (Save Material)"):
+    if st.button("Material speichern"):
         if issued > 0 or returned > 0:
             add_supply(st.session_state.username, business, item, issued, returned)
             st.success("✅ Material gespeichert!")
 
     # History
-    st.subheader("📋 Meine Einträge (My Entries)" if st.session_state.role == "employee" else "📋 Alle Einträge (All Entries)")
+    st.subheader("📋 Meine Einträge" if st.session_state.role == "employee" else "📋 Alle Einträge")
     current_month = date.today().strftime("%Y-%m")
     df = get_entries(st.session_state.username if st.session_state.role == "employee" else None, current_month)
     
     if not df.empty:
         st.dataframe(df, use_container_width=True)
-        st.success(f"Gesamtstunden (Total Hours): {df['hours'].sum():.2f}")
+        st.success(f"Gesamtstunden: {df['hours'].sum():.2f}")
     else:
-        st.info("Noch keine Einträge vorhanden (No entries yet)")
-
-    # Material History
-    supplies_df = get_supplies(st.session_state.username if st.session_state.role == "employee" else None)
-    if not supplies_df.empty:
-        st.subheader("Materialhistorie (Material History)")
-        st.dataframe(supplies_df, use_container_width=True)
+        st.info("Noch keine Einträge")
