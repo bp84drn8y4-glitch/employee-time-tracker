@@ -25,32 +25,20 @@ def init_db():
 
 init_db()
 
-# Material Lists
 MATERIAL_LISTS = {
     "Fürst Hauser Gebäudereinigung": [
-        "Müllbeutel Groß (Large trash bags) 120 L",
-        "Müllbeutel Medium (Medium) 60 L",
-        "Müllbeutel Klein (Small) 28 L",
-        "Wischmopp Mikrofaser (Microfiber mop) 50 cm",
-        "Wischmopp Baumwolle (Cotton mop) 50 cm",
-        "Mikrofaser Lappen rot (Red microfiber cloth)",
-        "Mikrofaser Lappen blau (Blue microfiber cloth)",
-        "Mikrofaser Lappen grün (Green microfiber cloth)",
-        "Mikrofaser Lappen gelb (Yellow microfiber cloth)",
-        "Geschirrtücher (Kitchen towels)",
-        "Sanitäreiniger (Bathroom cleaner)",
-        "Bodenreiniger (Floor cleaner)",
-        "Oberflächenreiniger (Surface cleaner)",
-        "Toilettenpapier (Toilet paper)",
-        "Falthandtücher (Hand towels)",
-        "Handseife (Hand soap)"
+        "Müllbeutel Groß (Large trash bags) 120 L", "Müllbeutel Medium (Medium) 60 L", 
+        "Müllbeutel Klein (Small) 28 L", "Wischmopp Mikrofaser (Microfiber mop) 50 cm",
+        "Wischmopp Baumwolle (Cotton mop) 50 cm", "Mikrofaser Lappen rot (Red)", 
+        "Mikrofaser Lappen blau (Blue)", "Mikrofaser Lappen grün (Green)", 
+        "Mikrofaser Lappen gelb (Yellow)", "Geschirrtücher (Kitchen towels)",
+        "Sanitäreiniger (Bathroom cleaner)", "Bodenreiniger (Floor cleaner)",
+        "Toilettenpapier (Toilet paper)", "Handseife (Hand soap)"
     ],
     "Bullauge Waschsalon": [
-        "Hände folien (Plastic gloves)",
-        "Bügelstärke (Ironing starch)",
-        "Chlor (Chlorine / Bleach)",
-        "Waschpulver (Washing powder) 20 kg",
-        "Weichspüler (Fabric softener) 20 Liter",
+        "Hände folien (Plastic gloves)", "Bügelstärke (Ironing starch)", 
+        "Chlor (Chlorine)", "Waschpulver (Washing powder) 20 kg", 
+        "Weichspüler (Fabric softener) 20 Liter"
     ]
 }
 
@@ -84,13 +72,6 @@ def get_entries(employee=None, month=None):
     df = pd.read_sql_query(query, conn, params=params)
     conn.close()
     return df
-
-def delete_entry(entry_id):
-    conn = sqlite3.connect(DB_FILE)
-    c = conn.cursor()
-    c.execute("DELETE FROM entries WHERE id = ?", (entry_id,))
-    conn.commit()
-    conn.close()
 
 def add_supply(employee, business, item, issued=0, returned=0):
     today = date.today().isoformat()
@@ -131,13 +112,13 @@ if "logged_in" not in st.session_state:
 st.title("🧹 Employee Time Tracker")
 
 if not st.session_state.logged_in:
-    tab1, tab2 = st.tabs(["🔑 Login", "👤 Mitarbeiter verwalten (Admin only)"])
+    tab1, tab2 = st.tabs(["🔑 Login", "👤 Mitarbeiter verwalten (Admin)"])
 
     with tab1:
         st.subheader("Login")
-        username = st.text_input("Benutzername (Username)", key="login_username")
-        password = st.text_input("Passwort (Password)", type="password", key="login_password")
-        if st.button("Anmelden (Login)", type="primary"):
+        username = st.text_input("Benutzername", key="login_user")
+        password = st.text_input("Passwort", type="password", key="login_pass")
+        if st.button("Anmelden", type="primary"):
             conn = sqlite3.connect(DB_FILE)
             c = conn.cursor()
             c.execute("SELECT role FROM users WHERE username=? AND password=?", (username, password))
@@ -154,20 +135,20 @@ if not st.session_state.logged_in:
 
     with tab2:
         st.subheader("Neuen Mitarbeiter hinzufügen")
-        new_user = st.text_input("Benutzername (Username)", key="new_user")
-        new_pass = st.text_input("Passwort (Password)", type="password", key="new_pass")
-        if st.button("Mitarbeiter erstellen (Create Employee)"):
+        new_user = st.text_input("Benutzername")
+        new_pass = st.text_input("Passwort", type="password")
+        if st.button("Mitarbeiter erstellen"):
             if new_user and new_pass:
                 if add_new_employee(new_user, new_pass):
-                    st.success(f"Mitarbeiter '{new_user}' wurde erfolgreich erstellt!")
+                    st.success(f"Mitarbeiter '{new_user}' erstellt!")
                 else:
                     st.error("Benutzername existiert bereits")
             else:
-                st.warning("Bitte Benutzername und Passwort eingeben")
+                st.warning("Bitte alle Felder ausfüllen")
 
 else:
     st.sidebar.success(f"✅ {st.session_state.username} ({st.session_state.role})")
-    if st.sidebar.button("Abmelden (Logout)"):
+    if st.sidebar.button("Abmelden"):
         st.session_state.clear()
         st.rerun()
 
@@ -178,41 +159,43 @@ else:
     with col2:
         end_time = st.time_input("Endzeit", datetime.strptime("17:00", "%H:%M").time())
     
-    task = st.text_input("Tätigkeit (Task)")
-    customer = st.text_input("Kunde / Projekt (Customer)")
+    task = st.text_input("Tätigkeit")
+    customer = st.text_input("Kunde / Projekt")
     
     if st.button("Eintrag speichern", type="primary"):
         if task and customer:
-            add_entry(st.session_state.username, start_time.strftime("%H:%M"), 
-                     end_time.strftime("%H:%M"), task, customer)
+            add_entry(st.session_state.username, start_time.strftime("%H:%M"), end_time.strftime("%H:%M"), task, customer)
             st.success("✅ Eintrag gespeichert!")
             st.rerun()
-        else:
-            st.warning("Tätigkeit und Kunde erforderlich")
 
-    # Material Section
     st.subheader("🧴 Material (Ausgabe / Rücknahme)")
     business = st.selectbox("Betrieb", list(MATERIAL_LISTS.keys()))
     item = st.selectbox("Material", MATERIAL_LISTS[business])
     
     col3, col4 = st.columns(2)
     with col3:
-        issued = st.number_input("Ausgabe (Issued)", min_value=0, value=0)
+        issued = st.number_input("Ausgabe", min_value=0, value=0)
     with col4:
-        returned = st.number_input("Rücknahme (Returned)", min_value=0, value=0)
+        returned = st.number_input("Rücknahme", min_value=0, value=0)
     
     if st.button("Material speichern"):
         if issued > 0 or returned > 0:
             add_supply(st.session_state.username, business, item, issued, returned)
             st.success("✅ Material gespeichert!")
 
-    # History
-    st.subheader("📋 Meine Einträge" if st.session_state.role == "employee" else "📋 Alle Einträge")
+    # ==================== HISTORY & ADMIN VIEW ====================
+    st.subheader("📋 Einträge" if st.session_state.role == "employee" else "📋 Alle Einträge")
     current_month = date.today().strftime("%Y-%m")
     df = get_entries(st.session_state.username if st.session_state.role == "employee" else None, current_month)
     
     if not df.empty:
         st.dataframe(df, use_container_width=True)
         st.success(f"Gesamtstunden: {df['hours'].sum():.2f}")
+
+    # Material Overview
+    st.subheader("🧴 Materialübersicht")
+    supplies_df = get_supplies(None if st.session_state.role == "employer" else st.session_state.username)
+    if not supplies_df.empty:
+        st.dataframe(supplies_df, use_container_width=True)
     else:
-        st.info("Noch keine Einträge")
+        st.info("Noch keine Materialdaten vorhanden.")
