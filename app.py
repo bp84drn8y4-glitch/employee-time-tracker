@@ -3,7 +3,7 @@ import pandas as pd
 from datetime import datetime, date
 import sqlite3
 
-st.set_page_config(page_title="Zeiterfassung / Time Tracker", layout="wide")
+st.set_page_config(page_title="Zeiterfassung (Time Tracker)", layout="wide")
 
 DB_FILE = "time_tracker.db"
 
@@ -25,6 +25,7 @@ def init_db():
 
 init_db()
 
+# ===================== MATERIAL LISTS =====================
 MATERIAL_LISTS = {
     "Fürst Hauser Gebäudereinigung": [
         "Müllbeutel Groß (Large trash bags) 120 L",
@@ -82,6 +83,13 @@ def get_entries(employee=None, month=None):
     conn.close()
     return df
 
+def delete_entry(entry_id):
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    c.execute("DELETE FROM entries WHERE id = ?", (entry_id,))
+    conn.commit()
+    conn.close()
+
 def add_supply(employee, business, item, issued=0, returned=0):
     today = date.today().isoformat()
     conn = sqlite3.connect(DB_FILE)
@@ -121,7 +129,7 @@ if "logged_in" not in st.session_state:
 st.title("🧹 Zeiterfassung (Employee Time Tracker)")
 
 if not st.session_state.logged_in:
-    tab1, tab2 = st.tabs(["🔑 Login", "👤 Mitarbeiter verwalten (Manage Employees - Admin only)"])
+    tab1, tab2 = st.tabs(["🔑 Login", "👤 Mitarbeiter verwalten (Admin only)"])
 
     with tab1:
         st.subheader("Anmelden (Login)")
@@ -178,7 +186,7 @@ else:
             st.success("✅ Eintrag gespeichert! (Entry saved!)")
             st.rerun()
         else:
-            st.warning("Tätigkeit und Kunde sind erforderlich (Task and Customer are required)")
+            st.warning("Tätigkeit und Kunde sind erforderlich (Task and Customer required)")
 
     st.subheader("🧴 Material (Ausgabe / Rücknahme - Issued / Returned)")
     business = st.selectbox("Betrieb (Business)", list(MATERIAL_LISTS.keys()))
@@ -195,7 +203,7 @@ else:
             add_supply(st.session_state.username, business, item, issued, returned)
             st.success("✅ Material gespeichert! (Material saved!)")
 
-    # History
+    # History Section
     st.subheader("📋 Meine Einträge (My Entries)" if st.session_state.role == "employee" else "📋 Alle Einträge (All Entries)")
     current_month = date.today().strftime("%Y-%m")
     df = get_entries(st.session_state.username if st.session_state.role == "employee" else None, current_month)
@@ -206,6 +214,7 @@ else:
     else:
         st.info("Noch keine Einträge vorhanden (No entries yet)")
 
+    # Material History
     supplies_df = get_supplies(st.session_state.username if st.session_state.role == "employee" else None)
     if not supplies_df.empty:
         st.subheader("🧴 Materialhistorie (Material History)")
